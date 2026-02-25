@@ -21,11 +21,20 @@ WORKDIR /app
 
 # ── Install system dependencies ──────────────────────────────
 # Some Python packages (like pipecat, aiohttp) need these to compile
+# OpenCV (cv2) — required by pipecat's SmallWebRTCTransport — needs
+# libxcb, libgl1, and libglib2.0 for image/video processing
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        gcc \
-        libffi-dev \
-        libssl-dev \
+    gcc \
+    libffi-dev \
+    libssl-dev \
+    libxcb1 \
+    libx11-6 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Install Python dependencies (cached layer) ───────────────
