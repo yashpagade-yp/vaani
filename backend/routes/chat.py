@@ -16,7 +16,7 @@ Routes:
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 
 from db.repositories.message_repo import (
     get_messages,
@@ -130,25 +130,42 @@ async def send_text_message(session_id: str, request: TextMessageRequest):
 
         # ── Step 3: Tool Call Loop (Max 3 turns to prevent infinite loops) ─────
         tools = get_all_tool_schemas()
-        
+        ai_text = ""
+        use_tools = True  # Can be disabled on retry if Groq fails with tool format
+
         for turn in range(3):
-            logger.info("Calling Groq (turn {}) | session={}", turn + 1, session_id)
-            
-            completion = await _groq_client.chat.completions.create(
-                model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
-                messages=messages,
-                tools=tools,
-                tool_choice="auto",
-                max_tokens=1024,
-                temperature=0.6,
-            )
-            
+            logger.info("Calling Groq (turn {}) | session={} tools={}", turn + 1, session_id, use_tools)
+
+            try:
+                call_params = {
+                    "model": settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+                    "messages": messages,
+                    "max_tokens": 1024,
+                    "temperature": 0.6,
+                }
+                # Only include tools if enabled (disabled on retry after tool_use_failed)
+                if use_tools:
+                    call_params["tools"] = tools
+                    call_params["tool_choice"] = "auto"
+
+                completion = await _groq_client.chat.completions.create(**call_params)
+
+            except BadRequestError as e:
+                # Groq returns 400 "tool_use_failed" when Llama generates
+                # malformed tool calls (XML format instead of JSON).
+                # Retry WITHOUT tools to get a plain text answer.
+                if "tool_use_failed" in str(e):
+                    logger.warning("Groq tool_use_failed, retrying without tools | session={}", session_id)
+                    use_tools = False
+                    continue
+                raise
+
             response_msg = completion.choices[0].message
             tool_calls = response_msg.tool_calls
 
             # If no tool calls, we have the final answer
             if not tool_calls:
-                ai_text = response_msg.content.strip()
+                ai_text = (response_msg.content or "").strip()
                 break
 
             # If tool calls, execute them
@@ -158,9 +175,9 @@ async def send_text_message(session_id: str, request: TextMessageRequest):
             for tool_call in tool_calls:
                 fn_name = tool_call.function.name
                 fn_args = json.loads(tool_call.function.arguments)
-                
+
                 logger.info("Executing tool: {} | args={}", fn_name, fn_args)
-                
+
                 handler = TOOL_HANDLERS.get(fn_name)
                 result_content = ""
 
