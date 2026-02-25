@@ -45,7 +45,7 @@ def create_transport(webrtc_connection: SmallWebRTCConnection) -> SmallWebRTCTra
         transport = create_transport(connection)
         task = build_pipeline(transport, session_id)
     """
-    logger.debug("Creating SmallWebRTC transport")
+    logger.debug("Creating SmallWebRTC transport (v1.1 - 16k input fix)")
 
     return SmallWebRTCTransport(
         webrtc_connection=webrtc_connection,
@@ -65,7 +65,7 @@ def create_transport(webrtc_connection: SmallWebRTCConnection) -> SmallWebRTCTra
             # Tuned for faster response (shorter silence timeout)
             vad_analyzer=SileroVADAnalyzer(
                 params=VADParams(
-                    stop_secs=0.5,  # Stop listening after 0.5s silence (was default 0.8s)
+                    stop_secs=0.7,  # Relaxed from 0.5 to 0.7 for better stability
                     start_secs=0.2, # Start listening after 0.2s speech
                     confidence=0.5, # Slightly more sensitive
                 )
