@@ -52,7 +52,7 @@ def create_transport(webrtc_connection: SmallWebRTCConnection) -> SmallWebRTCTra
         params=TransportParams(
             # Enable audio input: receive user's voice from browser
             audio_in_enabled=True,
-            audio_in_sample_rate=24000,   # Match TTS rate for consistent 24kHz audio
+            audio_in_sample_rate=16000,   # Silero VAD requires 16000 or 8000
 
             # Enable audio output: send AI's voice to browser
             audio_out_enabled=True,
