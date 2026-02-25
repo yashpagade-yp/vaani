@@ -37,6 +37,11 @@ _groq_client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1",
 )
 
+# Groq's dedicated tool-use model — llama-3.3-70b-versatile often generates
+# tool calls in XML format which Groq rejects with "tool_use_failed".
+# llama-3.1-8b-instant handles function calling format correctly.
+TOOL_USE_MODEL = "llama-3.1-8b-instant"
+
 
 # ── Request/Response Models ────────────────────────────────────────────────────
 
@@ -138,15 +143,18 @@ async def send_text_message(session_id: str, request: TextMessageRequest):
 
             try:
                 call_params = {
-                    "model": settings.GROQ_MODEL or "llama-3.3-70b-versatile",
                     "messages": messages,
                     "max_tokens": 1024,
                     "temperature": 0.6,
                 }
-                # Only include tools if enabled (disabled on retry after tool_use_failed)
+                # Use dedicated tool-use model when tools are enabled,
+                # fall back to regular model when tools are disabled
                 if use_tools:
+                    call_params["model"] = TOOL_USE_MODEL
                     call_params["tools"] = tools
                     call_params["tool_choice"] = "auto"
+                else:
+                    call_params["model"] = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
 
                 completion = await _groq_client.chat.completions.create(**call_params)
 
