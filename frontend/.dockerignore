@@ -1,0 +1,27 @@
+# ==============================================================
+# Vaani Frontend — .dockerignore
+# ==============================================================
+# Files listed here will NOT be copied into the Docker image.
+# ==============================================================
+
+# ── Node Modules (installed fresh inside Docker) ─────────────
+node_modules/
+
+# ── Build Output (built fresh inside Docker) ─────────────────
+dist/
+
+# ── IDE & OS ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Git ───────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Docker (don't copy Dockerfile into itself) ────────────────
+Dockerfile
+.dockerignore

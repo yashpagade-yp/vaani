@@ -1,0 +1,67 @@
+# ==============================================================
+# Vaani — Docker Compose
+# ==============================================================
+# Runs the entire Vaani stack with a single command:
+#
+#   docker-compose up --build
+#
+# Services:
+#   backend  → FastAPI on http://localhost:8000
+#   frontend → React (via Nginx) on http://localhost:3000
+#   mongo    → MongoDB on localhost:27017
+#
+# Stop everything:
+#   docker-compose down
+#
+# Stop and remove data:
+#   docker-compose down -v
+# ==============================================================
+
+services:
+  # ── MongoDB Database ──────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: vaani-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      # Persist data even if the container is removed
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  # ── Backend (FastAPI) ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vaani-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      # Load API keys from .env (not baked into image)
+      - ./backend/.env
+    environment:
+      # Override MongoDB URI to use the Docker network
+      # "mongo" is the service name above — Docker resolves it automatically
+      - MONGODB_URI=mongodb://mongo:27017/vaani
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  # ── Frontend (React + Nginx) ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vaani-frontend
+    ports:
+      # Maps your machine's port 3000 → container's port 80 (Nginx)
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# ── Volumes ─────────────────────────────────────────────────────
+# Named volumes persist data across container restarts
+volumes:
+  mongo_data:

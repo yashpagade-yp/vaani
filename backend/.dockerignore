@@ -1,0 +1,46 @@
+# ==============================================================
+# Vaani Backend — .dockerignore
+# ==============================================================
+# Files listed here will NOT be copied into the Docker image.
+# This keeps the image small and avoids leaking secrets.
+# ==============================================================
+
+# ── Virtual Environment (use container's Python instead) ──────
+venv/
+env/
+.venv/
+ENV/
+
+# ── Environment Variables (passed at runtime, not baked in) ───
+.env
+.env.local
+.env.production
+
+# ── Python Cache ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Tests (not needed in production image) ────────────────────
+tests/
+
+# ── IDE & OS ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Git ───────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Docker (don't copy Dockerfile into itself) ────────────────
+Dockerfile
+.dockerignore
