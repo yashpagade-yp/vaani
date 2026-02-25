@@ -1,0 +1,48 @@
+# ==============================================================
+# Vaani Backend — Python Dependencies
+# ==============================================================
+# Install with: pip install -r requirements.txt
+#
+# Pipecat extras explained:
+#   [webrtc]   → SmallWebRTC transport support
+#   [deepgram] → DeepgramSTTService
+#   [cartesia] → CartesiaTTSService
+#   [silero]   → SileroVAD (voice activity detection)
+#   [openai]   → OpenAILLMService (used for Groq's OpenAI-compatible API)
+# ==============================================================
+
+# ── Core Framework ─────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# ── Pipecat (Voice Pipeline) ───────────────────────────────────
+# 0.0.57 does NOT have SmallWebRTC — upgraded to 0.0.102 (latest)
+pipecat-ai[webrtc,deepgram,cartesia,silero,openai]==0.0.102
+
+# ── Database ───────────────────────────────────────────────────
+motor==3.6.0           # Async MongoDB driver (Motor = async PyMongo)
+# NOTE: pymongo is NOT pinned — motor 3.6.0 requires pymongo>=4.9,<4.10
+# Letting motor pull the correct pymongo version automatically
+pymongo>=4.9,<4.10
+
+# ── Configuration ──────────────────────────────────────────────
+# NOTE: pydantic version is NOT pinned strictly here.
+# pipecat-ai requires pydantic~=2.10.5, so we let pip pick the right version.
+pydantic>=2.10.5,<3.0.0
+pydantic-settings==2.6.1   # For BaseSettings (loads .env file)
+python-dotenv==1.0.1
+
+# ── Logging ────────────────────────────────────────────────────
+loguru==0.7.3
+
+# ── Timezone Support (for MCP datetime tool) ───────────────────
+pytz==2024.2
+
+# ── Testing ────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0     # For testing async functions
+httpx>=0.27.2              # HTTP client (testing + weather tool)
+
+# ── Tools ──────────────────────────────────────────────────────
+tavily-python>=0.5.0       # Tavily API: web search, crawl, extract
+tzdata                     # Timezone database for zoneinfo (required on Windows)

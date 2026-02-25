@@ -1,0 +1,209 @@
+/* VoiceOrb.module.css */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    position: relative;
+    padding: 60px 0 40px;
+}
+
+/* ── Ambient glow behind the orb ── */
+.ambientGlow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    transition: opacity var(--transition-slow);
+    opacity: 0;
+}
+
+.ambientActive {
+    opacity: 1;
+    animation: orb-breathe 3s ease-in-out infinite;
+}
+
+/* ── Pulse rings ── */
+.ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    border: 1.5px solid rgba(168, 85, 247, 0.4);
+    transform: translate(-50%, -50%);
+    animation: pulse-ring 2.5s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+    pointer-events: none;
+}
+
+.ring1 {
+    width: 160px;
+    height: 160px;
+    animation-delay: 0s;
+}
+
+.ring2 {
+    width: 200px;
+    height: 200px;
+    animation-delay: 0.6s;
+}
+
+.ring3 {
+    width: 240px;
+    height: 240px;
+    animation-delay: 1.2s;
+}
+
+/* ── Main orb button ── */
+.orb {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    z-index: 1;
+
+    /* Default (idle) state */
+    background: radial-gradient(135deg at 35% 35%,
+            rgba(124, 58, 237, 0.9) 0%,
+            rgba(76, 29, 149, 0.95) 50%,
+            rgba(30, 10, 60, 1) 100%);
+    box-shadow:
+        0 0 0 1px rgba(168, 85, 247, 0.3),
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        var(--shadow-glow-sm);
+    color: var(--purple-soft);
+}
+
+.orb:hover:not(:disabled) {
+    transform: scale(1.06);
+    box-shadow:
+        0 0 0 1px rgba(168, 85, 247, 0.5),
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        var(--shadow-glow-md);
+}
+
+.orb:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.orb:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Active call state */
+.orbActive {
+    background: radial-gradient(135deg at 35% 35%,
+            rgba(168, 85, 247, 1) 0%,
+            rgba(124, 58, 237, 0.95) 50%,
+            rgba(76, 29, 149, 1) 100%);
+    box-shadow:
+        0 0 0 2px rgba(192, 132, 252, 0.5),
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        var(--shadow-glow-md);
+    animation: pulse-glow 2s ease-in-out infinite;
+    color: white;
+}
+
+/* Error state */
+.orbError {
+    background: radial-gradient(135deg at 35% 35%,
+            rgba(239, 68, 68, 0.9) 0%,
+            rgba(185, 28, 28, 0.95) 100%);
+    box-shadow:
+        0 0 0 1px rgba(239, 68, 68, 0.4),
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 24px rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+/* Connecting state */
+.orbConnecting {
+    opacity: 0.8;
+}
+
+/* ── Waveform bars ── */
+.waveform {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 36px;
+}
+
+.bar {
+    width: 4px;
+    height: 100%;
+    background: white;
+    border-radius: 2px;
+    animation: wave-bar 0.8s ease-in-out infinite alternate;
+    transform-origin: bottom;
+}
+
+/* ── Spinner ── */
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ── Status label ── */
+.label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    transition: color var(--transition-normal);
+    text-align: center;
+}
+
+.labelError {
+    color: var(--accent-red);
+}
+
+/* ── Mute button ── */
+.muteBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.muteBtn:hover {
+    border-color: var(--border-active);
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+}
+
+.muteBtnActive {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: var(--accent-red);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.muteBtnActive:hover {
+    border-color: rgba(239, 68, 68, 0.6);
+    background: rgba(239, 68, 68, 0.12);
+}
