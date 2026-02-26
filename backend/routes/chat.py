@@ -133,80 +133,86 @@ async def send_text_message(session_id: str, request: TextMessageRequest):
             if role in ("user", "assistant"):
                 messages.append({"role": role, "content": msg.content})
 
-        # ── Step 3: Tool Call Loop (Max 3 turns to prevent infinite loops) ─────
+        # ── Step 3: Tool Call Loop ──────────────────────────────────────────────
+        # Strategy: Use small model (8b) for tool calling (correct JSON format),
+        # then use big model (70b) WITHOUT tools for the final response.
         tools = get_all_tool_schemas()
         ai_text = ""
-        use_tools = True  # Can be disabled on retry if Groq fails with tool format
+        tool_was_used = False
 
-        for turn in range(3):
-            logger.info("Calling Groq (turn {}) | session={} tools={}", turn + 1, session_id, use_tools)
+        # Turn 1: Ask the small model if it needs any tools
+        logger.info("Calling Groq (turn 1 - tool decision) | session={}", session_id)
 
-            try:
-                call_params = {
-                    "messages": messages,
-                    "max_tokens": 1024,
-                    "temperature": 0.6,
-                }
-                # Use dedicated tool-use model when tools are enabled,
-                # fall back to regular model when tools are disabled
-                if use_tools:
-                    call_params["model"] = TOOL_USE_MODEL
-                    call_params["tools"] = tools
-                    call_params["tool_choice"] = "auto"
-                else:
-                    call_params["model"] = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
-
-                completion = await _groq_client.chat.completions.create(**call_params)
-
-            except BadRequestError as e:
-                # Groq returns 400 "tool_use_failed" when Llama generates
-                # malformed tool calls (XML format instead of JSON).
-                # Retry WITHOUT tools to get a plain text answer.
-                if "tool_use_failed" in str(e):
-                    logger.warning("Groq tool_use_failed, retrying without tools | session={}", session_id)
-                    use_tools = False
-                    continue
+        try:
+            completion = await _groq_client.chat.completions.create(
+                model=TOOL_USE_MODEL,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+                max_tokens=1024,
+                temperature=0.6,
+            )
+        except BadRequestError as e:
+            if "tool_use_failed" in str(e):
+                logger.warning("Groq tool_use_failed, skipping tools | session={}", session_id)
+                # Fall through to final response without tools
+                completion = await _groq_client.chat.completions.create(
+                    model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.6,
+                )
+                ai_text = (completion.choices[0].message.content or "").strip()
+                tool_was_used = False
+            else:
                 raise
-
+        else:
             response_msg = completion.choices[0].message
             tool_calls = response_msg.tool_calls
 
-            # If no tool calls, we have the final answer
             if not tool_calls:
+                # No tools needed — use the response directly
                 ai_text = (response_msg.content or "").strip()
-                break
+            else:
+                # Execute tool calls
+                tool_was_used = True
+                messages.append(response_msg)
+                logger.info("Tool calls detected: {} | session={}", len(tool_calls), session_id)
 
-            # If tool calls, execute them
-            messages.append(response_msg)  # Add assistant's "I want to call X" message
-            logger.info("Tool calls detected: {} | session={}", len(tool_calls), session_id)
+                for tool_call in tool_calls:
+                    fn_name = tool_call.function.name
+                    fn_args = json.loads(tool_call.function.arguments)
 
-            for tool_call in tool_calls:
-                fn_name = tool_call.function.name
-                fn_args = json.loads(tool_call.function.arguments)
+                    logger.info("Executing tool: {} | args={}", fn_name, fn_args)
 
-                logger.info("Executing tool: {} | args={}", fn_name, fn_args)
+                    handler = TOOL_HANDLERS.get(fn_name)
+                    result_content = ""
 
-                handler = TOOL_HANDLERS.get(fn_name)
-                result_content = ""
+                    if handler:
+                        mock_params = MockFunctionCallParams(fn_name, fn_args)
+                        await handler(mock_params)
+                        result_content = mock_params.result or "No result returned"
+                    else:
+                        result_content = f"Error: Tool '{fn_name}' not found."
 
-                if handler:
-                    # Execute locally using our existing handler logic
-                    mock_params = MockFunctionCallParams(fn_name, fn_args)
-                    await handler(mock_params)
-                    result_content = mock_params.result or "No result returned"
-                else:
-                    result_content = f"Error: Tool '{fn_name}' not found."
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": fn_name,
+                        "content": str(result_content)
+                    })
 
-                # Append tool result to conversation
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": fn_name,
-                    "content": str(result_content)
-                })
-        else:
-            # If loop finishes without break, it means we hit max turns
-            ai_text = "I'm having trouble retrieving that information right now. Please try again."
+        # Turn 2: If tools were used, send results to the BIG model for a proper answer
+        if tool_was_used and not ai_text:
+            logger.info("Calling Groq (turn 2 - final answer with 70b) | session={}", session_id)
+            final_completion = await _groq_client.chat.completions.create(
+                model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+                messages=messages,
+                max_tokens=1024,
+                temperature=0.6,
+                # NO tools here — just summarize the tool results!
+            )
+            ai_text = (final_completion.choices[0].message.content or "").strip()
 
         # ── Step 4: Save AI reply ─────────────────────────────────────────────
         if not ai_text:
