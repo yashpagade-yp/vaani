@@ -9,10 +9,10 @@ What is Groq?
 - The API is OpenAI-compatible, so we use Pipecat's OpenAILLMService
   but point it at Groq's URL instead
 
-Model choice: llama-3.3-70b-versatile
-- "70b" = 70 billion parameters — much better reasoning and tool use
-- "versatile" = optimized for complex tasks including function calling
-- Required for reliable tool calling (8b-instant often misses tool calls)
+Model strategy:
+- llama-3.1-8b-instant: for tool calling (correct JSON format)
+- llama-3.3-70b-versatile: for general conversation without tools
+  (3.3-70b has a bug where it generates XML tool calls instead of JSON)
 
 Free tier: 14,400 requests/day, 6,000 tokens/minute on 70b
 """
@@ -21,6 +21,9 @@ from typing import Optional
 from pipecat.services.openai.llm import OpenAILLMService
 from core.config import settings
 from core.logger import logger
+
+# Model that reliably handles tool calling (correct JSON format)
+VOICE_TOOL_MODEL = "llama-3.1-8b-instant"
 
 
 def create_llm_service(tools: Optional[list] = None) -> OpenAILLMService:
@@ -36,14 +39,17 @@ def create_llm_service(tools: Optional[list] = None) -> OpenAILLMService:
 
     Returns:
         OpenAILLMService: Ready-to-use LLM service for the pipeline
-
-    Usage in pipeline:
-        llm = create_llm_service(tools=get_all_tool_schemas())
-        pipeline = Pipeline([..., llm, ...])
     """
+    # Use 8b-instant when tools are enabled (correct JSON tool format)
+    # Use 70b-versatile when no tools (better conversation quality)
+    if tools:
+        model = VOICE_TOOL_MODEL
+    else:
+        model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+
     logger.info(
         "Creating Groq LLM service | model={} tools={}",
-        settings.GROQ_MODEL,
+        model,
         len(tools) if tools else 0
     )
 
@@ -52,14 +58,11 @@ def create_llm_service(tools: Optional[list] = None) -> OpenAILLMService:
         api_key=settings.GROQ_API_KEY,
 
         # Point to Groq's API instead of OpenAI's
-        # This is the key difference — same format, different server
         base_url="https://api.groq.com/openai/v1",
 
-        # Which model to use (set in .env)
-        # Force 70b-versatile as default if .env is missing it, as 8b cannot use tools well
-        model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+        # Model selection based on whether tools are needed
+        model=model,
 
         # Tool schemas — tells Groq what tools Vaani has available
-        # Empty list means no tools, populated list enables tool calling
         tools=tools or [],
     )
